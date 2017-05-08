@@ -1,39 +1,36 @@
-from scipy import weave
 import numpy as np
 import cv2
 import sys
 
-def _thinningIteration(im, iter):
-	I, M = im, np.zeros(im.shape, np.uint8)
-	expr = """
-	for (int i = 1; i < NI[0]-1; i++) {
-		for (int j = 1; j < NI[1]-1; j++) {
-			int p2 = I2(i-1, j);
-			int p3 = I2(i-1, j+1);
-			int p4 = I2(i, j+1);
-			int p5 = I2(i+1, j+1);
-			int p6 = I2(i+1, j);
-			int p7 = I2(i+1, j-1);
-			int p8 = I2(i, j-1);
-			int p9 = I2(i-1, j-1);
 
-			int A  = (p2 == 0 && p3 == 1) + (p3 == 0 && p4 == 1) +
-			         (p4 == 0 && p5 == 1) + (p5 == 0 && p6 == 1) +
-			         (p6 == 0 && p7 == 1) + (p7 == 0 && p8 == 1) +
-			         (p8 == 0 && p9 == 1) + (p9 == 0 && p2 == 1);
-			int B  = p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9;
-			int m1 = iter == 0 ? (p2 * p4 * p6) : (p2 * p4 * p8);
-			int m2 = iter == 0 ? (p4 * p6 * p8) : (p2 * p6 * p8);
+def _thinningIteration(image, iter):
+    marker = np.zeros(image.shape, dtype=np.uint8)
+    for i in range(1, image.shape[0] - 1):
+        for j in range(1, image.shape[1] - 1):
+            p2 = image[i-1, j]
+            p3 = image[i-1, j+1]
+            p4 = image[i, j+1]
+            p5 = image[i+1, j+1]
+            p6 = image[i+1, j]
+            p7 = image[i+1, j-1]
+            p8 = image[i, j-1] 
+            p9 = image[i-1, j-1]  
 
-			if (A == 1 && B >= 2 && B <= 6 && m1 == 0 && m2 == 0) {
-				M2(i,j) = 1;
-			}
-		}
-	} 
-	"""
+            C  = (not p2 and (p3 or p4)) + (not p4 and (p5 or p6)) + \
+                     (not p6 and (p7 or p8)) + (not p8 and (p9 or p2))
+            N1 = (p9 or p2) + (p3 or p4) + (p5 or p6) + (p7 or p8)
+            N2 = (p2 or p3) + (p4 or p5) + (p6 or p7) + (p8 or p9)
+            N  = min(N1, N2)
+            m = 0
+            if iter == 0:
+                m = ((p6 or p7 or not p9) and p8)
+            else:
+                m = ((p2 or p3 or not p5) and p4)
 
-	weave.inline(expr, ["I", "iter", "M"])
-	return (I & ~M)
+            if C == 1 and (N >= 2 and N <= 3) and m == 0:
+                marker[i,j] = 1;
+
+    return image * (1 - marker)
 
 
 def thinning(src):
@@ -48,16 +45,16 @@ def thinning(src):
 		prev = dst.copy()
 		if np.sum(diff) == 0:
 			break
-
 	return dst * 255
 
+
 if __name__ == "__main__":
-	src = cv2.imread("kanji.png")
+	src = cv2.imread("kanji.bmp")
 	if src == None:
 		sys.exit()
-	bw = cv2.cvtColor(src, cv2.cv.CV_BGR2GRAY)
-	_, bw2 = cv2.threshold(bw, 10, 255, cv2.THRESH_BINARY)
-	bw2 = thinning(bw2)
+	bw = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+	_, bw2 = cv2.threshold(bw, 10, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+	bw2 = thinning(255 - bw2)
 	cv2.imshow("src", bw)
 	cv2.imshow("thinning", bw2)
 	cv2.waitKey()
