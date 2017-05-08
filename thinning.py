@@ -50,7 +50,7 @@ def thinning(src):
 
 if __name__ == "__main__":
 	src = cv2.imread("kanji.bmp")
-	if src == None:
+	if src is None:
 		sys.exit()
 	bw = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
 	_, bw2 = cv2.threshold(bw, 10, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
